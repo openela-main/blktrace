@@ -1,7 +1,7 @@
 Summary: Utilities for performing block layer IO tracing in the Linux kernel
 Name: blktrace
 Version: 1.2.0
-Release: 10%{?dist}
+Release: 11%{?dist}
 License: GPLv2+
 Group: Development/System
 Source:  http://brick.kernel.dk/snaps/blktrace-%{version}.tar.bz2
@@ -12,6 +12,8 @@ BuildRequires: gcc, libaio-devel, librsvg2-devel
 
 Patch0: blktrace-fix-btt-overflow.patch
 Patch1: blktrace-python3.patch
+# Upstream: blktrace-1.3.0-5-g1836be5
+Patch2: for-next-fix-hang-when-BLKTRACESETUP-fails-and-o-is-used.patch
 
 %description
 blktrace is a block layer IO tracing mechanism which provides detailed
@@ -27,6 +29,7 @@ information about IO patterns.
 %setup -q
 %patch0 -p1
 %patch1 -p1
+%patch2 -p1
 
 sed -i '1s=^#!/usr/bin/python3=#!%{__python3}=' \
     btt/{btt_plot.py,bno_plot.py}
@@ -80,6 +83,10 @@ information about IO patterns.
 %{_mandir}/man1/iowatcher.*
 
 %changelog
+* Fri Aug 16 2024 Pavel Reichl <preichl@redhat.com> - 1.2.0-11
+- fix hang when BLKTRACESETUP fails and "-o -" is used
+- Related: RHEL-17500
+
 * Tue May 14 2019 Eric Sandeen <sandeen@redhat.com> - 1.2.0-10
 - Add librsvg2-tools dependency to iowatcher (#1700065)
 
