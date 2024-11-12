@@ -1,0 +1,55 @@
+From 1836be5d99c9362f1e2b39206c95270f19cb7faa Mon Sep 17 00:00:00 2001
+From: Eric Sandeen <sandeen@redhat.com>
+Date: Wed, 5 Jun 2024 23:07:27 -0500
+Subject: [PATCH] fix hang when BLKTRACESETUP fails and "-o -" is used
+
+# blktrace -o - /dev/sda /dev/sdb /dev/sdc
+
+has to be SIGKILLed if BLKTRACESETUP fails for any or all of the devices
+listed. (I simulated this by just catching one of the devices in
+setup_buts(), skipping the ioctl, and doing ret++).
+
+This seems to be because with "-o -" on the command line, use_tracer_devpaths()
+sees piped_output set, so we call process_trace_bufs which ends up waiting on
+(!done) and "done" is never set. i.e.
+
+atexit(exit_tracing)
+	wait_tracers
+		if (use_tracer_devpaths()) // true because "-o -"
+			process_trace_bufs
+				while (wait_empty_entries())
+					wait_empty_entries
+						while (!done ... )
+							<loop forever>
+
+I think this can be avoided by just setting "done = 1" before returning
+when setup_buts() fails in run_tracers().
+
+Signed-off-by: Eric Sandeen <sandeen@redhat.com>
+Reviewed-by: Jeff Moyer <jmoyer@redhat.com>
+Link: https://lore.kernel.org/r/f3204c9d-1384-40b5-a5fb-3bb967ca2bec@redhat.com
+Signed-off-by: Jens Axboe <axboe@kernel.dk>
+Signed-off-by: Pavel Reichl <preichl@redhat.com>
+---
+ blktrace.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/blktrace.c b/blktrace.c
+index 3444fbb..038b2cb 100644
+--- a/blktrace.c
++++ b/blktrace.c
+@@ -2684,8 +2684,10 @@ static int run_tracers(void)
+ 	if (net_mode == Net_client)
+ 		printf("blktrace: connecting to %s\n", hostname);
+ 
+-	if (setup_buts())
++	if (setup_buts()) {
++		done = 1;
+ 		return 1;
++	}
+ 
+ 	if (use_tracer_devpaths()) {
+ 		if (setup_tracer_devpaths())
+-- 
+2.46.0
+
